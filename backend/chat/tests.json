@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "Test AI chat response",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "Здравствуйте, какие у вас услуги?"
+          }
+        ]
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "message": "string",
+        "request_id": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test OPTIONS for CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    }
+  ]
+}

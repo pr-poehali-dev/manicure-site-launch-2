@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
+import { ChatWidget } from '@/components/ChatWidget';
 
 const Index = () => {
   const { toast } = useToast();
@@ -660,6 +661,8 @@ const Index = () => {
           <p className="mt-4 text-sm text-white/60">© 2024 Все права защищены</p>
         </div>
       </footer>
+
+      {!isTelegramWebApp && <ChatWidget />}
     </div>
   );
 };
