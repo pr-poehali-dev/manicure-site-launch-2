@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -7,13 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import { useTelegram } from '@/hooks/useTelegram';
 
 const Index = () => {
   const { toast } = useToast();
+  const { tg, user, isTelegramWebApp } = useTelegram();
   const [selectedMaster, setSelectedMaster] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
 
   const services = [
     { id: '1', name: 'Классический маникюр', price: '1500 ₽', duration: '60 мин' },
@@ -37,6 +40,35 @@ const Index = () => {
     { name: 'Анастасия', rating: 5, text: 'Лучший мастер в городе! Всегда выхожу с идеальными ноготками.' },
   ];
 
+  useEffect(() => {
+    if (tg && isTelegramWebApp) {
+      tg.MainButton.setText('Записаться');
+      tg.MainButton.color = '#FF8BA0';
+      tg.MainButton.textColor = '#FFFFFF';
+      
+      if (selectedMaster && selectedService && selectedDate && selectedTime) {
+        tg.MainButton.show();
+        tg.MainButton.enable();
+      } else {
+        tg.MainButton.hide();
+      }
+    }
+  }, [tg, isTelegramWebApp, selectedMaster, selectedService, selectedDate, selectedTime]);
+
+  useEffect(() => {
+    if (tg && isTelegramWebApp) {
+      const handleMainButtonClick = () => {
+        handleBooking();
+      };
+      
+      tg.MainButton.onClick(handleMainButtonClick);
+      
+      return () => {
+        tg.MainButton.offClick(handleMainButtonClick);
+      };
+    }
+  }, [tg, isTelegramWebApp, selectedMaster, selectedService, selectedDate, selectedTime]);
+
   const handleBooking = () => {
     if (!selectedMaster || !selectedService || !selectedDate || !selectedTime) {
       toast({
@@ -47,20 +79,39 @@ const Index = () => {
       return;
     }
 
-    toast({
-      title: "Запись подтверждена!",
-      description: `Вы записаны на ${selectedDate} в ${selectedTime}. Мы ждём вас!`,
-    });
+    const master = masters.find(m => m.id === selectedMaster);
+    const service = services.find(s => s.id === selectedService);
+    
+    const bookingData = {
+      master: master?.name || '',
+      service: service?.name || '',
+      price: service?.price || '',
+      date: selectedDate,
+      time: selectedTime,
+      user: user?.first_name || 'Гость',
+      userId: user?.id || 0,
+    };
+
+    if (isTelegramWebApp && tg) {
+      tg.sendData(JSON.stringify(bookingData));
+      tg.close();
+    } else {
+      toast({
+        title: "Запись подтверждена!",
+        description: `Вы записаны на ${selectedDate} в ${selectedTime}. Мы ждём вас!`,
+      });
+    }
 
     setSelectedMaster('');
     setSelectedService('');
     setSelectedDate('');
     setSelectedTime('');
+    setIsBookingDialogOpen(false);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-secondary/20">
-      <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-border">
+      <header className={`fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-border ${isTelegramWebApp ? 'hidden' : ''}`}>
         <nav className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-primary">Студия маникюра</h1>
@@ -70,7 +121,7 @@ const Index = () => {
               <a href="#reviews" className="hover:text-primary transition-colors">Отзывы</a>
               <a href="#contacts" className="hover:text-primary transition-colors">Контакты</a>
             </div>
-            <Dialog>
+            <Dialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90">
                   <Icon name="Calendar" className="mr-2" size={18} />
@@ -153,16 +204,17 @@ const Index = () => {
         </nav>
       </header>
 
-      <section className="pt-32 pb-20 px-4">
+      <section className={`${isTelegramWebApp ? 'pt-8' : 'pt-32'} pb-20 px-4`}>
         <div className="container mx-auto text-center">
-          <h2 className="text-5xl md:text-7xl font-bold mb-6 animate-fade-in text-foreground">
-            Красота ваших ногтей —<br />наша страсть
+          <h2 className={`${isTelegramWebApp ? 'text-3xl md:text-4xl' : 'text-5xl md:text-7xl'} font-bold mb-6 animate-fade-in text-foreground`}>
+            {isTelegramWebApp ? `Привет, ${user?.first_name || 'Гость'}!` : 'Красота ваших ногтей —'}
+            {!isTelegramWebApp && <><br />наша страсть</>}
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in">
-            Профессиональный маникюр в уютной атмосфере. Используем только качественные материалы и современные техники.
+            {isTelegramWebApp ? 'Выберите удобное время для записи на маникюр' : 'Профессиональный маникюр в уютной атмосфере. Используем только качественные материалы и современные техники.'}
           </p>
-          <div className="flex gap-4 justify-center animate-scale-in">
-            <Dialog>
+          <div className={`flex gap-4 justify-center animate-scale-in ${isTelegramWebApp ? 'hidden' : ''}`}>
+            <Dialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="lg" className="bg-primary hover:bg-primary/90">
                   Записаться на процедуру
@@ -248,7 +300,7 @@ const Index = () => {
         </div>
       </section>
 
-      <section id="services" className="py-20 px-4 bg-white">
+      <section id="services" className={`py-20 px-4 ${isTelegramWebApp ? 'bg-transparent' : 'bg-white'}`}>
         <div className="container mx-auto">
           <h2 className="text-4xl md:text-5xl font-bold text-center mb-12">Наши услуги</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -260,12 +312,24 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-primary mb-4">{service.price}</p>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="w-full" variant="outline">
-                        Записаться
-                      </Button>
-                    </DialogTrigger>
+                  {isTelegramWebApp ? (
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedService(service.id);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                    >
+                      Выбрать
+                    </Button>
+                  ) : (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" variant="outline">
+                          Записаться
+                        </Button>
+                      </DialogTrigger>
                     <DialogContent className="sm:max-w-[500px]">
                       <DialogHeader>
                         <DialogTitle className="text-2xl">Онлайн-запись</DialogTitle>
@@ -338,6 +402,7 @@ const Index = () => {
                       </Button>
                     </DialogContent>
                   </Dialog>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -345,7 +410,80 @@ const Index = () => {
         </div>
       </section>
 
-      <section id="gallery" className="py-20 px-4 bg-secondary/20">
+      {isTelegramWebApp && (
+        <section className="py-8 px-4">
+          <div className="container mx-auto max-w-lg">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-2xl">Форма записи</CardTitle>
+                <CardDescription>Заполните все поля для записи</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="tg-master">Выберите мастера</Label>
+                  <Select value={selectedMaster} onValueChange={setSelectedMaster}>
+                    <SelectTrigger id="tg-master">
+                      <SelectValue placeholder="Мастер" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {masters.map((master) => (
+                        <SelectItem key={master.id} value={master.id}>
+                          {master.name} — {master.specialty}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="tg-service">Выберите услугу</Label>
+                  <Select value={selectedService} onValueChange={setSelectedService}>
+                    <SelectTrigger id="tg-service">
+                      <SelectValue placeholder="Услуга" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {services.map((service) => (
+                        <SelectItem key={service.id} value={service.id}>
+                          {service.name} — {service.price}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="tg-date">Выберите дату</Label>
+                  <input
+                    id="tg-date"
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="tg-time">Выберите время</Label>
+                  <Select value={selectedTime} onValueChange={setSelectedTime}>
+                    <SelectTrigger id="tg-time">
+                      <SelectValue placeholder="Время" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeSlots.map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
+
+      <section id="gallery" className={`py-20 px-4 ${isTelegramWebApp ? 'hidden' : 'bg-secondary/20'}`}>
         <div className="container mx-auto">
           <h2 className="text-4xl md:text-5xl font-bold text-center mb-12">Галерея работ</h2>
           <Tabs defaultValue="all" className="w-full">
@@ -420,7 +558,7 @@ const Index = () => {
         </div>
       </section>
 
-      <section id="reviews" className="py-20 px-4 bg-white">
+      <section id="reviews" className={`py-20 px-4 ${isTelegramWebApp ? 'hidden' : 'bg-white'}`}>
         <div className="container mx-auto">
           <h2 className="text-4xl md:text-5xl font-bold text-center mb-12">Отзывы клиентов</h2>
           <div className="grid md:grid-cols-3 gap-6">
@@ -450,7 +588,7 @@ const Index = () => {
         </div>
       </section>
 
-      <section id="contacts" className="py-20 px-4 bg-secondary/20">
+      <section id="contacts" className={`py-20 px-4 ${isTelegramWebApp ? 'hidden' : 'bg-secondary/20'}`}>
         <div className="container mx-auto">
           <h2 className="text-4xl md:text-5xl font-bold text-center mb-12">Контакты</h2>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -505,7 +643,7 @@ const Index = () => {
         </div>
       </section>
 
-      <footer className="bg-foreground text-white py-8 px-4">
+      <footer className={`bg-foreground text-white py-8 px-4 ${isTelegramWebApp ? 'hidden' : ''}`}>
         <div className="container mx-auto text-center">
           <p className="text-lg mb-4">Студия маникюра — ваша красота в надёжных руках</p>
           <div className="flex gap-4 justify-center">
